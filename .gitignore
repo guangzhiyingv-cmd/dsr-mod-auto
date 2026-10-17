@@ -1,0 +1,14 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Generated job output and local dependency trees
+*_job/
+extracted/
+tools/
+*.fbmod
+*.blend1
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

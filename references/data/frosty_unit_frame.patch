@@ -1,0 +1,10 @@
+--- a/tools/FrostyToolsuite-src/FrostyToolsuite-1.0.7/Plugins/MeshSetPlugin/Fbx/FBXImporter.cs
++++ b/tools/FrostyToolsuite-src/FrostyToolsuite-1.0.7/Plugins/MeshSetPlugin/Fbx/FBXImporter.cs
+@@ -1305,3 +1305,4 @@
+-                            Vector3 normal = Vector3.TransformNormal(vertex.GetValue<Vector3>("Normal"), sectionMatrix);
+-                            Vector3 tangent = Vector3.TransformNormal(vertex.GetValue<Vector3>("Tangent"), sectionMatrix);
+-                            Vector3 binormal = Vector3.TransformNormal(vertex.GetValue<Vector3>("Binormal"), sectionMatrix);
++                            // Stored frame vectors must not inherit the FBX object's uniform scale.
++                            Vector3 normal = Vector3.Normalize(Vector3.TransformNormal(vertex.GetValue<Vector3>("Normal"), sectionMatrix));
++                            Vector3 tangent = Vector3.Normalize(Vector3.TransformNormal(vertex.GetValue<Vector3>("Tangent"), sectionMatrix));
++                            Vector3 binormal = Vector3.Normalize(Vector3.TransformNormal(vertex.GetValue<Vector3>("Binormal"), sectionMatrix));

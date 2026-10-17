@@ -1,0 +1,47 @@
+{
+  "description": "Adapted source snapshots; original scripts remain unchanged. External game and tool binaries are not bundled.",
+  "files": [
+    {
+      "source": "source/prepare_huohua_mod.py",
+      "source_sha256": "aabea937691dab5415e8a9b09d140b3fed2c3f7f957563a460d80f6a6b29fcb7",
+      "bundled": "scripts/_prepare_core.py",
+      "bundled_sha256": "13f877aa1f560da230477d83d2189bdcddf0314b775e134d4ad88704cb71df34"
+    },
+    {
+      "source": "source/pose_mod_to_dead_space.py",
+      "source_sha256": "e4d891e8765ed884f00a3c590180dc29152a87d1b33074f0ae8d52e49654b8df",
+      "bundled": "scripts/_pose_core.py",
+      "bundled_sha256": "e1b81cc59b23c40b711bc21cd3eb176f595692f32da3f053088e2db371b8cf90"
+    },
+    {
+      "source": "source/fit_huohua_hands.py",
+      "source_sha256": "128076423951a12d5247f505f85099e612aaddcc6978b4d2dc3b96a8fe7a03a6",
+      "bundled": "scripts/_hands_core.py",
+      "bundled_sha256": "3580ba435b2d2617c717d4e65cc5e8ef525deb2a921d72b1211391b5e058278a"
+    },
+    {
+      "source": "assets/modtoolkit/presets/bone/dead_space_2023.json",
+      "source_sha256": "6e6c651a4053ff0afb02a39faf8ab01b171b0e1a0e03c557d4a65e70bbbe46dc",
+      "bundled": "references/data/dead_space_bones.json",
+      "bundled_sha256": "00b8f211cf297a3bd2def5253759528cf3b4a8d850d136ff31b595c2ccb77570"
+    },
+    {
+      "source": "assets/modtoolkit/poses/dead_space_2023_reference.json",
+      "source_sha256": "fc6874e45c453056d6a59e0c1b06dc8eb61f70f7d787b7f0caea05c6e755eb55",
+      "bundled": "references/data/dead_space_pose.json",
+      "bundled_sha256": "fc6874e45c453056d6a59e0c1b06dc8eb61f70f7d787b7f0caea05c6e755eb55"
+    },
+    {
+      "source": "source/frosty_unit_frame.patch",
+      "source_sha256": "ffed9a6d9736e01b15680f6e446fb5c732e0d39d207bd127a247d832ca3107b0",
+      "bundled": "references/data/frosty_unit_frame.patch",
+      "bundled_sha256": "82828d4927341dd4a1e5d7a2d7b6d318192ec024cb9c67a214eb3d067b18b025"
+    }
+  ],
+  "adaptations": [
+    "Generalized preparation names and configuration",
+    "Added direct PMX/PMD import and current-visible static freeze",
+    "Added measured A-to-T normalization before the existing T-to-DSR engine",
+    "Made rest-position float checks relative to model scale"
+  ]
+}
