@@ -94,6 +94,18 @@ def load_config(path):
                 "runtime_manifest", "source_preset", "native_blend", "skeleton_xml"):
         item = Path(value[key]).expanduser()
         value[key] = str((path.parent / item).resolve() if not item.is_absolute() else item.resolve())
+    value.setdefault("skeleton_correction", True)
+    if not isinstance(value["skeleton_correction"], bool):
+        raise ValueError("skeleton_correction must be true or false.")
+    defaults = {
+        "skeleton_cli": "tools/FrostyToolsuite-src/FrostyToolsuite-1.0.7/FrostyEditor/bin/Release/Final/DsrCli.exe",
+        "skeleton_globals_bank": "extracted/globals_shared.bin",
+        "skeleton_baseline_ebx": "extracted/skeleton/Player_Skeleton.original.ebx",
+        "skeleton_compiler": "D:/VisualStudio/MSBuild/Current/Bin/Roslyn/csc.exe",
+    }
+    for key, default in defaults.items():
+        item = Path(value.get(key, str(Path(value["workspace"]) / default) if key != "skeleton_compiler" else default))
+        value[key] = str((path.parent / item).resolve() if not item.is_absolute() else item.resolve())
     if not Path(value["release_dir"]).is_dir():
         raise ValueError("The configured release directory must already exist beside the source model.")
     if inside(value["release_dir"], value["output"]):

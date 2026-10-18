@@ -15,8 +15,9 @@ By default one package replaces two suits at once: **Isaac Lv1** and
 - A reviewable Blender project (`stages/pose.blend`, `stages/cleanup.blend`, ...).
 - Suit-specific FBX parts (eleven per suit), each with the correct section node.
 - One canonical base-color atlas plus the flat/constant packed maps.
-- A validated `.fbmod` using the original game skeleton, with no skeleton or
-  animation override.
+- One validated `.fbmod` containing the character and, by default, matched
+  skeleton references plus Head visual-offset compensation. Animation clips
+  remain unchanged. Disable the correction with `--no-skeleton-correction`.
 
 ## Repository layout
 
@@ -47,13 +48,28 @@ External tools and assets are **not bundled** and must be supplied by you:
 - An unedited native reference BLEND containing the game rig and the
   `Player_Skeleton.xml`.
 - The Modding-Toolkit MMD import preset JSON (`MMD.json`).
+- For the default skeleton correction: the original globals ANT bank and raw
+  Player_Skeleton EBX, a skeleton-capable CLI and the VS2022 C# compiler. See
+  [skeleton correction](references/skeleton-correction.md) for configuration.
 
 The DSR pose reference and bone mapping used by the pipeline are bundled under
 `references/data/`.
 
 ## Install
 
-Copy or clone this repository anywhere, then call its CLI with your Python:
+Keep one Git checkout as the maintenance source. On Windows, point the shared
+`%USERPROFILE%/.agents/skills/dsr-mod-auto` directory and the OpenCode-specific
+`%USERPROFILE%/.config/opencode/skills/dsr-mod-auto` directory to that checkout
+with directory junctions. Archive existing independent installations outside
+skill discovery roots first. Codex already discovers the shared `.agents`
+entry, so do not also install a duplicate under `.codex/skills`.
+
+Changes in the checkout then reach both applications without copying or syncing
+separate versions. Retain the checkout's `.git` directory and GitHub remote.
+Reload the applications' skill lists after changing discovery entries. Local
+consolidation does not automatically commit or push changes to GitHub.
+
+Call the checkout's CLI with your Python:
 
 ```powershell
 $python  = 'D:\python\python.exe'

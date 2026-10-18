@@ -108,6 +108,17 @@ Keep a separate game-test feedback record with reporter, date, issue, result,
 package path and SHA256. Preserve build-time `runtime_tested:false` history.
 Never infer animation/backside coverage from a single screenshot or user report.
 
+## Default skeleton correction and one-package delivery
+
+The inventory counts above describe the validated base input. By default,
+`skeleton_correction` adds one SkeletonAsset EBX and one globals ANT RES, with
+no extra chunks. The final merged inventory is therefore `T+1` EBX,
+`11*T + 3*sum(families) + 1` RES and the original chunk count. Verify the base
+geometry/composition first, the skeleton separately, and every merged raw
+payload against the exact disjoint union. Deliver only the merged FBMOD.
+With correction disabled, the base counts and original skeleton apply.
+Read [skeleton-correction.md](skeleton-correction.md) for construction and limits.
+
 ## Application is a separate task
 
 Dead Space's Frosty fork physically applies compiled data to the installed

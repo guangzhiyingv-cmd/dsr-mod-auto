@@ -52,6 +52,11 @@ def initialize(args):
         "native_blend": environment(args.native_blend, "extracted/blender/isaac_protagonist_merged_skeleton.blend"),
         "native_rig_object": args.native_rig,
         "skeleton_xml": environment(args.skeleton_xml, "extracted/skeleton/Player_Skeleton.xml"),
+        "skeleton_correction": not args.no_skeleton_correction,
+        "skeleton_cli": environment(args.skeleton_cli, "tools/FrostyToolsuite-src/FrostyToolsuite-1.0.7/FrostyEditor/bin/Release/Final/DsrCli.exe"),
+        "skeleton_globals_bank": environment(args.skeleton_globals_bank, "extracted/globals_shared.bin"),
+        "skeleton_baseline_ebx": environment(args.skeleton_baseline_ebx, "extracted/skeleton/Player_Skeleton.original.ebx"),
+        "skeleton_compiler": str(Path(args.skeleton_compiler).resolve()),
         "stages": stages, "source_pose": source_pose,
         "mmd_addon": "bl_ext.user_default.mmd_tools", "mmd_import_scale": 0.08,
         "static_morph_policy": "current_visible",
@@ -65,6 +70,7 @@ def initialize(args):
 
 
 def preflight(config):
+    from skeleton_correction import dependencies
     for key in ("input", "blender", "cli", "runtime_manifest", "source_preset", "native_blend", "skeleton_xml"):
         if not Path(config[key]).is_file():
             raise FileNotFoundError(key + ": " + config[key])
@@ -79,7 +85,8 @@ def preflight(config):
                 raise ValueError("A source image changed after import: " + image["path"])
     return {"input_sha256": sha256(config["input"]), "native_sha256": sha256(config["native_blend"]),
             "source_preset_sha256": sha256(config["source_preset"]), "runtime": runtime,
-            "normalized_importer": True, "skeleton_override": False}
+            "normalized_importer": True, "skeleton_override": False,
+            "skeleton_environment": dependencies(config)}
 
 
 def invoke(command, log, cwd=None):
@@ -114,8 +121,8 @@ def run(config, config_path, through):
     if state_path.exists():
         state = json.loads(state_path.read_text(encoding="utf-8"))
         if (state["config_sha256"] != digest
-                or any(state[key] != checks[key] for key in
-                       ("input_sha256", "native_sha256", "source_preset_sha256", "runtime"))):
+                or any(state.get(key) != checks[key] for key in
+                       ("input_sha256", "native_sha256", "source_preset_sha256", "runtime", "skeleton_environment"))):
             raise ValueError("Job inputs changed; create a new output directory rather than mixing stages.")
         if sha256(state["current_blend"]) != state["current_sha256"]:
             raise ValueError("Saved working stage changed outside this job; start a new job from that copy.")
@@ -227,8 +234,14 @@ def build(config, config_path):
     report = {"package": {"path": str(mod), "bytes": mod.stat().st_size, "sha256": sha256(mod)},
               "plan": planned, "preflight": runtime, "commands": commands,
               "installed": False, "runtime_tested": False, "config_sha256": sha256(config_path)}
+    if config["skeleton_correction"]:
+        from skeleton_correction import build as build_skeleton
+        correction = build_skeleton(config, config_path, report["package"], invoke)
+        report["body_package"] = report["package"]
+        report["package"] = correction["package"]
+        report["skeleton_correction"] = correction
     write_json(package / "build_manifest.json", report)
-    print("BUILT " + str(mod))
+    print("BUILT " + report["package"]["path"])
 
 
 def verify(config, config_path):
@@ -243,6 +256,10 @@ def verify(config, config_path):
     report = json.loads((package / "verification/final_validation.json").read_text(encoding="utf-8"))
     report["package_sha256"] = build_report["package"]["sha256"]
     report["verification_command"] = command
+    if config["skeleton_correction"]:
+        from skeleton_correction import verify as verify_skeleton
+        report["skeleton_correction"] = verify_skeleton(build_report["skeleton_correction"])
+        report["skeleton_override"] = build_report["skeleton_correction"]["applied"]
     write_json(package / "verification/final_validation.json", report)
     print("VERIFIED " + build_report["package"]["path"])
 
@@ -256,6 +273,11 @@ def release(config, config_path):
     if (not validation.get("passed") or validation.get("package_sha256") != digest
             or build_report["config_sha256"] != sha256(config_path)):
         raise ValueError("Release requires successful validation of this exact package.")
+    if config["skeleton_correction"]:
+        from skeleton_correction import verify as verify_skeleton
+        verify_skeleton(build_report["skeleton_correction"])
+        if not validation.get("skeleton_correction", {}).get("passed"):
+            raise ValueError("Release requires validated skeleton correction.")
     directory = Path(config["release_dir"])
     directory.mkdir(parents=True, exist_ok=True)
     destination = directory / mod.name
@@ -265,7 +287,10 @@ def release(config, config_path):
     write_json(directory / (config["name"] + ".release.json"), {"package": str(destination),
         "sha256": digest, "bytes": mod.stat().st_size,
         "validation": str(package / "verification/final_validation.json"),
-        "installed": False, "runtime_tested": False, "skeleton_override": False})
+        "installed": False, "runtime_tested": False,
+        "skeleton_override": bool(build_report.get("skeleton_correction", {}).get("applied")),
+        "skeleton_correction_mode": "matched_head_visual_offset" if config["skeleton_correction"] else "disabled",
+        "single_package": True})
     print(str(destination))
 
 
@@ -285,6 +310,11 @@ def main():
     init.add_argument("--native-blend", help="unedited native reference BLEND path")
     init.add_argument("--native-rig", default="Reference", help="native reference armature object name")
     init.add_argument("--skeleton-xml", help="Player_Skeleton.xml path")
+    init.add_argument("--no-skeleton-correction", action="store_true", help="Disable the default matched skeleton plus Head visual compensation")
+    init.add_argument("--skeleton-cli", help="CLI supporting skeleton translation import and package readback")
+    init.add_argument("--skeleton-globals-bank", help="Unmodified globals ANT bank")
+    init.add_argument("--skeleton-baseline-ebx", help="Original raw Player_Skeleton EBX")
+    init.add_argument("--skeleton-compiler", default="D:/VisualStudio/MSBuild/Current/Bin/Roslyn/csc.exe")
     init.add_argument("--mesh", nargs="+", default=["CharacterMesh"])
     init.add_argument("--source-mesh-parts", nargs="*", default=[],
                       help="MESH:PART pairs whose whole source mesh maps to one DSR part")

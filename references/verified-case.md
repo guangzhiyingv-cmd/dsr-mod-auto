@@ -1,5 +1,25 @@
 # Verified Huohua case and historical branches
 
+## Current optional default: SuoMing matched skeleton with Head compensation
+
+The user confirmed package SHA256
+`74a09a0024a6874065e8982b40685eb10a4dba11a7ee60a79245bba2ab0f4472`
+effective and requested matched skeleton plus Head visual offset as a default-on
+option. The user also requires one final FBMOD. Follow
+[skeleton-correction.md](skeleton-correction.md); the historical no-skeleton
+default and rejected probes below do not supersede that explicit selection.
+
+The self-contained skill helpers regenerated the same raw SkeletonAsset and
+globals payloads from SuoMing's prepared BLEND, exactly matching the confirmed
+package. They merged those with the unchanged base into a single FBMOD and
+read it back to verify the exact union of raw inputs. The offline test artifact
+is `extracted/dsr_jobs/skeleton_skill_validation_v2/job/package/skeleton/combined/`;
+its SHA256 is `fadc9cf137530dbab20f0fcfb4ab0043cd493c359099b575e05eb570c2d483a6`.
+This new merged artifact was not installed or separately game-tested.
+
+The combination is case-confirmed, not all-model/all-animation acceptance.
+Keep the new optional default distinct from the historical experiments below.
+
 This case is evidence for workflow decisions, not a universal model preset.
 Original source and third-party/game assets are not bundled with the skill.
 Source snapshot hashes and adapted module hashes are in `data/provenance.json`.
@@ -18,8 +38,9 @@ still the source of the material-pair and lighting lessons. See
 - Original build name: `huohua_lv1_no_inner_faces.fbmod`; the user renamed it.
 - Corresponding BLEND:
   `extracted/huohua_no_inner_faces/huohua_no_inner_faces.blend`.
-- User reported the skirt/collar blackening solved. Hands were previously
-  confirmed basically fixed; exhaustive animation/backside coverage was not.
+- User reported the skirt/collar blackening solved. Earlier localized-fitting
+  improvement reports do not establish correct whole-character deformation;
+  exhaustive animation/backside coverage was not confirmed.
 - This release includes no SkeletonAsset or animation override.
 
 Original project: `tests/huohua/huohua_mmd.blend`, SHA256
@@ -58,10 +79,10 @@ leftleg=1590, rightleg=1568`.
 
 - Full native-body fitting excessively stretched the model and was rejected.
 - Copying Neck frames without mesh deformation was proposed, then canceled.
-  The user requested shoulder scaling only and confirmed the Neck issue fixed.
-- Skeleton position overrides were tested separately. Their visual displacement
-  compounded the model mismatch, and they did not solve the fingers. The
-  user chose native-skeleton-driven geometry fitting instead.
+  The user requested shoulder scaling only; it remains a geometry checkpoint.
+- Skeleton position overrides were tested separately. The user subsequently
+  chose native-skeleton-driven geometry fitting; these experiments do not
+  establish a general runtime displacement correction.
 - The hand-only package intentionally used the old importer and white PACKED_1
   for an isolated experiment. It is historical, not a current combined baseline.
 - `huohua_lv1_hand_ik_normal_fix.fbmod` combines hand fitting with correct normal
@@ -69,10 +90,11 @@ leftleg=1590, rightleg=1568`.
 - Reference-mod topology/atlas/composition observations were useful. Its white
   PACKED_1 values were wrong for this Lv1 material setup.
 
-The hypothesis that some animated joints directly use stored translations
-(particularly Neck/Hand) explains why whole-body skeleton offsets were
-counterproductive, but the animation mechanism was not fully reverse-engineered.
-Do not state that hypothesis as a proven universal Frostbite rule.
+On 2026-10-18 the user clarified that apparent displacement can affect all
+weighted mesh regions. Its cause remains unresolved. Current animation
+extraction/parsing are not fully correct, so exported animation channels
+must not be used as proof of runtime bone behavior or a displacement diagnosis.
+Earlier localized explanations have been removed.
 
 ## Local detailed records
 

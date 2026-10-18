@@ -6,8 +6,11 @@ description: Build Dead Space (2023) Isaac character replacement FBMODs from raw
 # DSR Mod Auto
 
 Produce a reviewable Blender project, suit-specific FBX parts, one base-color
-atlas per family, and a validated character FBMOD using the original game
-skeleton. The bundled automation implements the locally verified Isaac Lv1 and
+atlas per family, and one validated character FBMOD. By default, include matched
+skeleton proportions plus Head visual-offset compensation in that same package.
+This optional correction is enabled unless the user disables it. Read
+[skeleton-correction.md](references/skeleton-correction.md) before building.
+The bundled automation implements the locally verified Isaac Lv1 and
 Legacy contracts and packages both suits into one FBMOD by default. Each suit's
 resource/section/material contract was inspected from the game and must not be
 interpolated from another suit. Adding a further suit needs its own inspected
@@ -67,13 +70,25 @@ or exact retained-bone count to another character. Do not automatically fit the
 entire body to every original joint; that approach excessively stretched the
 tested model. A new model's appearance still requires visual review.
 
+## Deformation evidence limits
+
+The user clarified on 2026-10-18 that apparent displacement is observed across
+all weighted mesh regions in the tested case. Do not frame it as a defect confined to selected joints
+or assume the rest of the body is unaffected. Current animation extraction
+and parsing are not fully correct; exported channel tables and transforms
+cannot establish runtime displacement causes. Keep geometric fitting steps
+as empirical preparation operations, not a proven general correction or an
+animation-based diagnosis. Review the entire skinned character in game.
+
 ## Keep these technical invariants
 
 - Use the unedited native skeleton for the wrist/finger target. A user-aligned
   game rig is a different reference. Preserve native world conversion and units.
 - DSR mesh import does not write FBX bind transforms into `Player_Skeleton`.
   Mesh fitting and a SkeletonAsset override are separate operations. This
-  pipeline emits no skeleton or animation override.
+  base geometry import does not replace it. The default correction separately
+  generates matched EBX/ANT references plus Head inverse-bind compensation and
+  merges them into the final character FBMOD; it does not edit animation clips.
 - Legs change spread only during pose conversion; preserve forward pitch and
   foot/toe orientation. Do not introduce the earlier forward leg tilt.
 - Sum helper weights into an appropriate retained deform ancestor. Resolve
@@ -112,14 +127,16 @@ stage, inspect its log, and correct that issue; do not continue a partial build
 or loop on tool failures. A changed job configuration needs a fresh output
 directory, preserving existing outputs.
 
-Deliver clickable paths to the final BLEND and validated FBMOD, the target suit,
+Deliver clickable paths to the final BLEND and one validated FBMOD, the target suit,
 what changed, and the actual validation performed. Record game-test feedback
 separately against the tested package SHA256. Offline validation does not imply
 an in-game test. If the user renamed a matching package, preserve that rename.
 
 For regressions, read [verified-case.md](references/verified-case.md), which
 separates user-confirmed game behavior from measured offline checks and labels
-older experimental branches. Do not inherit those branches as current defaults.
+older experimental branches. The user-confirmed SuoMing matched-plus-Head
+combination is now an explicit default option; older bind-only, ANT-only,
+inline-animation and head-look controller probes remain historical experiments.
 The [Lossi raw-input trial](references/lossi-raw-trial.md) verifies the complete
 base-PMX front end, including the separate A-to-T intermediate. The
 [SuoMing dual-suit trial](references/suoming-dual-suit-trial.md) records the

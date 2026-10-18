@@ -1,5 +1,15 @@
 # Geometry, pose, and skinning
 
+## Deformation evidence limits
+
+The user clarified on 2026-10-18 that apparent displacement is observed across
+all weighted mesh regions in the tested case. Do not frame it as a defect confined to selected joints
+or assume the rest of the body is unaffected. Current animation extraction
+and parsing are not fully correct; exported channel tables and transforms
+cannot establish runtime displacement causes. Keep geometric fitting steps
+as empirical preparation operations, not a proven general correction or an
+animation-based diagnosis. Review the entire skinned character in game.
+
 ## Pose conversion
 
 Raw A-pose inputs first pass through `_tpose_core.py`. Detect pose from actual

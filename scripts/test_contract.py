@@ -35,6 +35,46 @@ class ContractTests(unittest.TestCase):
         write_json(self.config_path, self.config)
         return load_config(self.config_path)
 
+    def test_skeleton_correction_defaults_on_and_can_be_disabled(self):
+        self.assertTrue(self.load()["skeleton_correction"])
+        self.config["skeleton_correction"] = False
+        config = self.load()
+        self.assertFalse(config["skeleton_correction"])
+        from skeleton_correction import dependencies
+        self.assertIsNone(dependencies(config))
+
+    def test_skeleton_option_rejects_non_boolean_values(self):
+        self.config["skeleton_correction"] = "false"
+        with self.assertRaisesRegex(ValueError, "true or false"):
+            self.load()
+
+    def test_skeleton_validation_rejects_changed_final_package(self):
+        from skeleton_correction import verify
+        final = self.root / "single.fbmod"
+        final.write_bytes(b"validated payload")
+        report = {"passed": True, "applied": True, "validation": "report.json",
+                  "artifacts": {str(final): sha256(final)}}
+        self.assertTrue(verify(report)["single_package"])
+        final.write_bytes(b"different payload")
+        with self.assertRaisesRegex(ValueError, "artifact changed"):
+            verify(report)
+
+    def test_native_aligned_profile_does_not_require_fabricated_ant_edits(self):
+        import sys
+        core = str(Path(__file__).resolve().parent / "skeleton")
+        if core not in sys.path:
+            sys.path.insert(0, core)
+        from prepare_matched import patch_defaults
+        report = {"joints": [{"name": "Head", "parent_index": -1}],
+                  "defaults": [{"name": "Head.t", "value": [0, 0, 0]},
+                               {"name": "Head.q", "value": [0, 0, 0, 1]},
+                               {"name": "Head.s", "value": [1, 1, 1]}]}
+        payload, edits, before, after, error = patch_defaults(b"unchanged", report, {"Head": [0, 0, 0]})
+        self.assertEqual(payload, b"unchanged")
+        self.assertEqual(edits, [])
+        self.assertEqual(before, after)
+        self.assertEqual(error, 0)
+
     def test_relative_paths_resolve_against_job_file(self):
         config = self.load()
         self.assertEqual(Path(config["input"]), self.root / "input.blend")

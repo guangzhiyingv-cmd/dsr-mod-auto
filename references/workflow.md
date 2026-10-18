@@ -95,6 +95,12 @@ prepared one.
 
 `init` writes explicit local paths and these defaults:
 
+- `skeleton_correction`: `true`. Matched skeleton plus Head visual compensation
+  is merged into the single final character FBMOD. Pass
+  `--no-skeleton-correction` to retain the original game skeleton. Read
+  [skeleton-correction.md](skeleton-correction.md) for the four dependency paths,
+  algorithm, evidence and checks. Missing dependencies do not disable it silently.
+
 - `stages` for an already converted BLEND: `atlas, rig, split, scale, hands,
   cleanup, export`. Raw PMX/PMD defaults prepend `import, static, tpose, pose`.
   A BLEND initialized with `--source-pose A`, `T`, or `AUTO` prepends `static,
