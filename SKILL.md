@@ -7,8 +7,13 @@ description: Build Dead Space (2023) Isaac character replacement FBMODs from raw
 
 Produce a reviewable Blender project, suit-specific FBX parts, one base-color
 atlas per family, and one validated character FBMOD. By default, include matched
-skeleton proportions plus Head visual-offset compensation in that same package.
-This optional correction is enabled unless the user disables it. Read
+skeleton proportions in that same package. Never apply the former fixed Head
+visual-offset compensation. The Head/LeftForeArm animation translation repair is
+a separate package that must be enabled alongside the character; `--animation-fix`
+records that requirement and is off by default. Read
+[animation-fix.md](references/animation-fix.md) when enabling it.
+Use `--no-skeleton-correction` to deliver the character body and skeleton
+correction as separate FBMODs; the correction is still generated. Read
 [skeleton-correction.md](references/skeleton-correction.md) before building.
 The bundled automation implements the locally verified Isaac Lv1 and
 Legacy contracts and packages both suits into one FBMOD by default. Each suit's
@@ -43,11 +48,11 @@ describe the current workstation; configuration permits other installations.
 For a raw MMD model: import, freeze the current visible static state on a copy,
 identify the pose, convert A-pose to T-pose if necessary, then convert T-pose to
 DSR pose. Save and validate each intermediate pose. Only then perform atlas,
-rig cleanup, splitting, shoulder-height alignment, targeted hands, duplicate-layer
+rig cleanup, splitting, height alignment, targeted hands, duplicate-layer
 cleanup, and export. Read [geometry.md](references/geometry.md) before adjusting
 pose, proportions, bone mapping, or weights.
 
-The required order is **A -> T -> DSR -> shoulder-height alignment**. A source
+The required order is **A -> T -> DSR -> height alignment**. A source
 already in T-pose skips the A-to-T rotations. A source already in DSR pose skips
 both pose conversions; never normalize that prepared pose back to T automatically.
 
@@ -59,7 +64,9 @@ deliberately rejects incompatible inputs rather than guessing.
 
 The default geometry method preserves most of the model's proportions:
 
-1. Match mean native `LeftShoulder`/`RightShoulder` height with a uniform scale.
+1. Match native `Head` bone-origin height with a uniform scale by default.
+   Select `--height-alignment shoulder` to match mean native
+   `LeftShoulder`/`RightShoulder` height instead. Honor an explicit user choice.
 2. Keep upper-arm roots fixed and solve the arms to native wrists, extending
    both arm segments proportionally only as needed within the configured limit.
 3. Fit Hand and deform fingers to original native frames while baking mesh
@@ -87,8 +94,11 @@ animation-based diagnosis. Review the entire skinned character in game.
 - DSR mesh import does not write FBX bind transforms into `Player_Skeleton`.
   Mesh fitting and a SkeletonAsset override are separate operations. This
   base geometry import does not replace it. The default correction separately
-  generates matched EBX/ANT references plus Head inverse-bind compensation and
-  merges them into the final character FBMOD; it does not edit animation clips.
+  generates matched EBX/ANT references without fixed Head compensation and
+  merges them into the final character FBMOD. `--animation-fix` only records that
+  the standalone repair package must be loaded with the character; the skill
+  never adds animation banks to character builds. Do not regenerate
+  per-character animation offsets.
 - Legs change spread only during pose conversion; preserve forward pitch and
   foot/toe orientation. Do not introduce the earlier forward leg tilt.
 - Sum helper weights into an appropriate retained deform ancestor. Resolve
@@ -117,8 +127,9 @@ actual FBMOD rather than treating FBX export as proof of a valid mod.
 `build`, `verify`, and `release`. Blender stages run in separate background
 processes through `scripts/blender_pipeline.py`. Private core modules preserve
 the tested algorithms and load no source code from historical Huohua scripts.
-External Blender add-ons, Frosty binaries, keys, game assets, and the native
-reference BLEND/XML remain explicit environment dependencies.
+The normalized `DsrCli` runtime, checksum manifest, game key, native reference
+BLEND/skeleton data and MMD preset ship with the skill. Blender with its add-ons
+and the installed game remain explicit environment dependencies.
 
 Keep commands, input/tool hashes, stage reports, an inspectable BLEND, package
 hashes, and final validation under the job directory. Render or inspect front,
@@ -127,16 +138,20 @@ stage, inspect its log, and correct that issue; do not continue a partial build
 or loop on tool failures. A changed job configuration needs a fresh output
 directory, preserving existing outputs.
 
-Deliver clickable paths to the final BLEND and one validated FBMOD, the target suit,
+Deliver clickable paths to the final BLEND and the validated FBMOD (or both
+body and skeleton FBMODs when split delivery was selected), the target suit,
 what changed, and the actual validation performed. Record game-test feedback
 separately against the tested package SHA256. Offline validation does not imply
 an in-game test. If the user renamed a matching package, preserve that rename.
 
 For regressions, read [verified-case.md](references/verified-case.md), which
 separates user-confirmed game behavior from measured offline checks and labels
-older experimental branches. The user-confirmed SuoMing matched-plus-Head
-combination is now an explicit default option; older bind-only, ANT-only,
-inline-animation and head-look controller probes remain historical experiments.
+older experimental branches. The SuoMing matched-plus-Head
+combination and older bind-only, ANT-only, inline-animation and head-look
+controller probes are historical experiments. The user-confirmed Vivian
+translation-removal experiment supersedes fixed Head compensation: retain
+matched references; the independent animation repair is a separate package, and
+`--animation-fix` records that it must be loaded alongside the character.
 The [Lossi raw-input trial](references/lossi-raw-trial.md) verifies the complete
 base-PMX front end, including the separate A-to-T intermediate. The
 [SuoMing dual-suit trial](references/suoming-dual-suit-trial.md) records the

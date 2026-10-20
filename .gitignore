@@ -9,6 +9,9 @@ tools/
 *.fbmod
 *.blend1
 
+# Bundled runtime: transient log; the game key ships because the workflow needs it
+runtime/sdk.log
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

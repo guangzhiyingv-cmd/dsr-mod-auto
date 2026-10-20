@@ -3,7 +3,7 @@
 ## Environment and input contract
 
 The tested environment is Windows, Blender 5.2.2 LTS, Material Combiner 2.1.3.0,
-Python with Pillow, and the repository's DsrCli/Frosty fork. NumPy and Pillow
+Python with Pillow, and the skill's bundled DsrCli runtime. NumPy and Pillow
 must also be available to Blender. External resources are not bundled.
 
 `init` writes absolute paths into the job config. `--workspace` defaults to the
@@ -19,17 +19,30 @@ workstation, not requirements:
 | Python | `D:/python/python.exe` (needs Pillow) |
 | Blender | `blender` on PATH (`--blender`) |
 | Game | `--game` (must contain a `Data/` directory) |
-| Normalized CLI runtime | `<workspace>/extracted/huohua_hand_normal_fix/runtime/DsrCli.exe` |
-| Runtime checksums | `<workspace>/extracted/huohua_hand_normal_fix/runtime/manifest.json` |
-| Original native BLEND | `<workspace>/extracted/blender/isaac_protagonist_merged_skeleton.blend` |
-| Original skeleton XML | `<workspace>/extracted/skeleton/Player_Skeleton.xml` |
-| MMD source mapping | `%APPDATA%/Blender Foundation/Blender/5.2/scripts/addons/Modding-Toolkit/assets/presets/import/MMD.json` |
+| Normalized CLI runtime | `<skill>/runtime/DsrCli.exe` (bundled; the default) |
+| Runtime checksums | `<skill>/runtime/manifest.json` (bundled; the default) |
+| Game encryption key | `<skill>/runtime/deadspace.key` (bundled) |
+| Original native BLEND | `<skill>/references/data/native/isaac_protagonist_merged_skeleton.blend` (bundled) |
+| Original skeleton XML | `<skill>/references/data/native/Player_Skeleton.xml` (bundled) |
+| Skeleton bank and baseline EBX | `<skill>/references/data/native/` (bundled) |
+| MMD source mapping | `<skill>/references/data/mmd_import.json` (bundled) |
 
-The normalized runtime is a dependency inherited from the successful build,
-not a Huohua-specific mesh processor. `preflight` verifies all 73 recorded binary
-hashes, including the CLI and MeshSetPlugin. An alternative runtime needs a
-matching manifest and verified N/T/B normalization. Do not satisfy the check
-by simply marking an old runtime normalized.
+The normalized runtime is bundled in `runtime/` as the tested DsrCli toolchain,
+including its DSR profile SDK, plugins, game key and asset cache. `preflight`
+verifies all recorded binary hashes, including the CLI and MeshSetPlugin. The
+native reference BLEND, skeleton XML, globals bank, baseline EBX and MMD preset
+are bundled under `references/data/`. Remove `runtime/Caches/` to force a rebuild
+from the installed game after a game update, then rerun the CLI once. Regenerate
+the manifest with `scripts/make_runtime_manifest.py --runtime <dir>` when
+replacing the runtime. The animation translation repair is an external package:
+the skill records the requirement with `--animation-fix` and never builds,
+merges or copies it. `release` reminds the user to enable
+`dsr_animation_fix.fbmod` alongside the character package. The skeleton-capable
+CLI and compiler are required for matching and skeleton correction.
+
+An alternative runtime needs a matching manifest and verified N/T/B
+normalization. Do not satisfy the check by simply marking an old runtime
+normalized.
 
 PMX/PMD inputs now run directly through `import`, `static`, `tpose`, and `pose`
 before the original preparation stages. See [raw-input.md](raw-input.md) for
@@ -95,9 +108,13 @@ prepared one.
 
 `init` writes explicit local paths and these defaults:
 
-- `skeleton_correction`: `true`. Matched skeleton plus Head visual compensation
-  is merged into the single final character FBMOD. Pass
-  `--no-skeleton-correction` to retain the original game skeleton. Read
+- `skeleton_correction`: `true`. Matched skeleton without fixed Head visual compensation
+  is merged into the single final character FBMOD. Every build also merges the
+  pinned independent animation repair described in [animation-fix.md](animation-fix.md). Pass
+  `--no-skeleton-correction` to release separate body and skeleton FBMODs instead;
+  it sets `skeleton_package_mode: "split"` and leaves correction enabled.
+  Default delivery mode is `merged`. For a body-only job, explicitly set
+  `skeleton_correction: false` with `skeleton_package_mode: "merged"`. Read
   [skeleton-correction.md](skeleton-correction.md) for the four dependency paths,
   algorithm, evidence and checks. Missing dependencies do not disable it silently.
 
@@ -113,6 +130,16 @@ prepared one.
   `isaac_lv1 isaac_legacy`; pass `--targets isaac_lv1` for a single suit. Each
   target exports its own section-named FBX set and contributes its own texture
   families and suit-composition removal, all packaged into one FBMOD.
+- `height_alignment`: `head` by default, measuring the `Head` bone origin.
+  Pass `--height-alignment shoulder` to use the mean of `LeftShoulder` and
+  `RightShoulder`; `--height-alignment head` explicitly selects the default.
+  Both modes uniformly scale the whole character about `scale_pivot`, after
+  DSR pose conversion and before the existing hand fit. This choice does not
+  enable native elbow fitting or change skeleton-correction settings.
+  Reports record the selected mode, bones, factor and measured heights.
+  Older configs missing this field now select Head; use a fresh job when
+  changing alignment. Older resumable states without a mode are treated as
+  shoulder-based so a completed shoulder stage cannot silently resume as Head.
 - `source_pose`: raw inputs default to `AUTO`, prepared BLEND to `DSR`.
   `AUTO` accepts clear A/T cases and stops for ambiguous poses; inspect those
   cases instead of guessing. `DSR` skips both conversion stages.
@@ -126,12 +153,16 @@ prepared one.
   before increasing it.
 - `up_axis`: 2 (world Z); `scale_pivot`: `[0,0,0]`. Inspect both coordinate
   systems and ground origins. Record the native reference's intentional world
-  conversion and the source import scale: the measured shoulder factor can
+  conversion and the source import scale: the measured height factor can
   legitimately bridge those units. Distinguish that from an accidental double
   conversion rather than rejecting every factor near 0.01 or 100.
 - `inner_material_pairs`: empty. Set confirmed `[outer_index, inner_index]`
   pairs using the original pre-atlas material indices. Never copy another
   model's indices. Empty means no duplicate-face removal.
+- `coincident_hidden_pairs`: empty. Set `[hidden, cover]` pairs to remove a
+  same-winding hidden layer only where the covering face is fully opaque in the
+  atlas. `coincident_duplicate_materials` lists materials whose exact duplicate
+  faces collapse to one. See [geometry.md](geometry.md) before enabling either.
 
 The static cleanup maps available source semantic joints to DSR and merges eye
 weights into Head. If the user needs eye animation, clothing physics, morphs,
@@ -158,6 +189,8 @@ canonical atlas and record its source hash rather than rebaking it needlessly.
 `state.json` records successful stages and input/config/current-BLEND hashes.
 Resuming a stable job skips completed stages. Changed configuration or externally
 edited stages need a new job/output; do not silently mix them with old exports.
+Changed animation-repair dependencies invalidate resume state. Use a fresh job
+for this revised workflow; do not resume historical Head-compensated outputs.
 Build output directories and releases are not overwritten. Blender inspection
 and preparation may need host execution approval; use the normal tool mechanism.
 The scripts never install mods, launch the game, or change installed add-ons.

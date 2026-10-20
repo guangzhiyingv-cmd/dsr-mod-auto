@@ -108,15 +108,28 @@ Keep a separate game-test feedback record with reporter, date, issue, result,
 package path and SHA256. Preserve build-time `runtime_tested:false` history.
 Never infer animation/backside coverage from a single screenshot or user report.
 
-## Default skeleton correction and one-package delivery
+## Optional animation repair and matched skeleton
 
-The inventory counts above describe the validated base input. By default,
-`skeleton_correction` adds one SkeletonAsset EBX and one globals ANT RES, with
-no extra chunks. The final merged inventory is therefore `T+1` EBX,
-`11*T + 3*sum(families) + 1` RES and the original chunk count. Verify the base
-geometry/composition first, the skeleton separately, and every merged raw
-payload against the exact disjoint union. Deliver only the merged FBMOD.
-With correction disabled, the base counts and original skeleton apply.
+The inventory counts above describe the validated geometry/composition input.
+With `--animation-fix`, the build first merges the pinned animation repair as one
+additional RES and no EBX/chunks. See [animation-fix.md](animation-fix.md). Its
+actual merged raw payload must match the independent repair exactly. The geometry
+and composition readback remains against the unmodified base input.
+
+Default matched skeleton correction adds one SkeletonAsset EBX and one globals
+ANT RES, without extra chunks or fixed Head visual compensation. With the
+optional animation repair also enabled, the final inventory is `T+1` EBX,
+`11*T + 3*sum(families) + 2` RES and the original chunk count. Disabling the
+repair drops its RES; disabling skeleton correction drops the extra EBX/ANT. The
+animation repair is never placed in the character import plan.
+
+Verify each disjoint merge's actual raw-payload union. With split delivery,
+release `<name>_body.fbmod` containing geometry, textures, composition and (when
+enabled) the animation repair, plus `<name>_skeleton.fbmod` containing matched
+EBX/ANT only. The internal merged audit package is not also delivered. If skeleton
+matching is a no-op, release the body package without fabricating a skeleton
+override.
+The release manifest records animation verification and `head_visual_offset:false`.
 Read [skeleton-correction.md](skeleton-correction.md) for construction and limits.
 
 ## Application is a separate task

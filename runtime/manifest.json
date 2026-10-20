@@ -1,0 +1,136 @@
+{
+  "schema": "dsr_runtime_manifest_v1",
+  "normalized_plugin_source": "Plugins/MeshSetPlugin.dll",
+  "normalized_plugin_sha256": "0e0e38ef91d373ea90a375bcb3ad45497f3f13b853d2ee6cfa55d9bec05d27f4",
+  "frame_patch": "references/data/frosty_unit_frame.patch",
+  "tools": [
+    {
+      "path": "DsrCli.exe",
+      "sha256": "847033f1824d7bb992c01fa9f5b87d53f18b6d03f75d8f3862c2296e2cc235ca"
+    },
+    {
+      "path": "FrostyControls.dll",
+      "sha256": "6f54fef555eadab7e3a6749400f048a1a7a18a92c535662cad9f414c8c2561a7"
+    },
+    {
+      "path": "FrostyCore.dll",
+      "sha256": "f9a65a78a410fecaf34aaa90414158480dc1730b321ea4444697703eca312aa0"
+    },
+    {
+      "path": "FrostyHash.dll",
+      "sha256": "862b9741524f448a3c14cf0f8c47d538a875315f4fc3da981079fbbd1b333269"
+    },
+    {
+      "path": "FrostyModSupport.dll",
+      "sha256": "365b4acca9c25e9787d42f264ad7e999bcc375dfe6cb5e52b85b683f5dc0e5ec"
+    },
+    {
+      "path": "FrostySdk.dll",
+      "sha256": "b772806b53107c688f0a5a14ce58240bb4a9891dff7f2910b8ff09f10c906241"
+    },
+    {
+      "path": "Newtonsoft.Json.dll",
+      "sha256": "7f912b28a07c226e0be3acfb2f57f050538aba0100fa1f0bf2c39f1a1f1da814"
+    },
+    {
+      "path": "Plugins/AssetBankPlugin.dll",
+      "sha256": "13af753a7064db756ba6083145a771742349d91f9c2c69daf1a5e2a455a76f0b"
+    },
+    {
+      "path": "Plugins/MeshSetPlugin.dll",
+      "sha256": "0e0e38ef91d373ea90a375bcb3ad45497f3f13b853d2ee6cfa55d9bec05d27f4"
+    },
+    {
+      "path": "Plugins/RefreshMeshVariationsPlugin.dll",
+      "sha256": "a715ec9bc2e8f5f5bbe47bb8570ef87f4b994fd7200ebc00b6017bacf6c12674"
+    },
+    {
+      "path": "Plugins/TexturePlugin.dll",
+      "sha256": "f5557dfebaf16bd8c789a3719016936b4ff5dbd36a49cfe5809e357c21f91cf4"
+    },
+    {
+      "path": "Profiles/DeadSpaceSDK.dll",
+      "sha256": "33d08479fecb7494117843ddb7fe6a42ba99267d6b56789b327fc24134f1d8b3"
+    },
+    {
+      "path": "ThirdParty/CryptBase.dll",
+      "sha256": "3e87682118e593f334ba665826e2a6ab85ba460f2e1fe95b173a7199863ad454"
+    },
+    {
+      "path": "ThirdParty/dpapi.dll",
+      "sha256": "4f5b1bedde45f8992f88ded368af71b019b1603564139ad9357a115cc428ccb0"
+    },
+    {
+      "path": "ThirdParty/dxtex.dll",
+      "sha256": "6645caada793111356a0d5564ff469755f44218cf6bb0897c62646069c2fdb7a"
+    },
+    {
+      "path": "ThirdParty/libfbxsdk.dll",
+      "sha256": "e1238a45c283cae0fd3aac5b28d9a04c75ffebfc74bdeb9deaa6b7eccff42b5e"
+    },
+    {
+      "path": "ThirdParty/liblz4.so.1.8.0.dll",
+      "sha256": "22602628f070e9ab791cb555454c058d7798e89944f107e155e5972c441654a3"
+    },
+    {
+      "path": "ThirdParty/libzstd.0.0.6.dll",
+      "sha256": "c9af5a51772bed1d72e79ef4edd51507f4a6ff8cf7bd10a19544e1f34b23b063"
+    },
+    {
+      "path": "ThirdParty/libzstd.1.1.5.dll",
+      "sha256": "0867f59daed96843482970643d4a5c2be80b8c5d7c7e723986512fb7d94ef2ed"
+    },
+    {
+      "path": "ThirdParty/libzstd.1.2.0.dll",
+      "sha256": "1bb3d00cff9436011cfec303385fbe180b434cd0d854feb25cd10c7832f40405"
+    },
+    {
+      "path": "ThirdParty/libzstd.1.3.4.dll",
+      "sha256": "9bef1e2c8eee89d9f54713f01808aacb195bbded5991e11f80b88d132b60f5e4"
+    },
+    {
+      "path": "ThirdParty/luacmp.dll",
+      "sha256": "7ac9d24591b67b6c58c247b9ac0d834144756579bd65fd555b1a5e38a6578c0f"
+    },
+    {
+      "path": "ThirdParty/NAudio.dll",
+      "sha256": "afe31e250907a6f6fb8d6aebd79c576ef4d73ad61bc403de29cab8f4621de1d2"
+    },
+    {
+      "path": "ThirdParty/SharpDX.D3DCompiler.dll",
+      "sha256": "268b44a78354f7a225e5b1567223179c7b73453c0a27eb4bf18bb57d7a8e08d9"
+    },
+    {
+      "path": "ThirdParty/SharpDX.Desktop.dll",
+      "sha256": "924c87f90b87b36fbb6dee401431abf7e2ffcf767fb773eb72771ea85a8d3a19"
+    },
+    {
+      "path": "ThirdParty/SharpDX.Direct2D1.dll",
+      "sha256": "9f4b5e240cb42ce903082f81633bba0c781c1e684fd5903bc3915e3805b5e83e"
+    },
+    {
+      "path": "ThirdParty/SharpDX.Direct3D11.dll",
+      "sha256": "56f525e33494f4cd2a560a71cdf237303a3fb54a8fa44e1693eba35c9245c60a"
+    },
+    {
+      "path": "ThirdParty/SharpDX.dll",
+      "sha256": "a0af255ea4b09a8cdb995b8c6fd1075e46f098e23c2351c974e6ded9b8b620cf"
+    },
+    {
+      "path": "ThirdParty/SharpDX.DXGI.dll",
+      "sha256": "bc0243134c93c55ea105d0e9c2a43b6030e973290d0a061cf3a61986a2268a88"
+    },
+    {
+      "path": "ThirdParty/SharpDX.Mathematics.dll",
+      "sha256": "4c9615496970ea84320e2a6e99f8fb828e3c7790384df5585d93fc368885d94e"
+    },
+    {
+      "path": "ThirdParty/SharpDX.XAudio2.dll",
+      "sha256": "dea60551b50418ac950bdbe9ae68c3b3357f18ed5535915868fa48af7234e72a"
+    },
+    {
+      "path": "ThirdParty/zlibwapi.dll",
+      "sha256": "8fe8a32bf055ed27a4615324c0058428d6e32565255f569dba771d2525db5448"
+    }
+  ]
+}

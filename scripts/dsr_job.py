@@ -9,8 +9,9 @@ import shutil
 import subprocess
 import sys
 
-from dsr_common import (DEFAULT_WORKSPACE, PARTS, SKELETON, SKILL, STAGES, SUITS,
-                        check_runtime, load_config, sha256, write_json)
+from dsr_common import (BUNDLED_DATA, BUNDLED_RUNTIME, DEFAULT_WORKSPACE, PARTS,
+                        SKELETON, SKILL, STAGES, SUITS, check_runtime,
+                        default_skeleton_compiler, load_config, sha256, write_json)
 
 
 def initialize(args):
@@ -36,7 +37,12 @@ def initialize(args):
         parts_map[name] = part
 
     def environment(value, default):
-        return str(Path(value).expanduser().resolve()) if value else str((workspace / default).resolve())
+        if value:
+            return str(Path(value).expanduser().resolve())
+        item = Path(default).expanduser()
+        if not item.is_absolute():
+            item = workspace / item
+        return str(item.resolve())
 
     config = {"schema": "dsr_mod_job_v1", "targets": list(args.targets), "name": args.name,
         "workspace": str(workspace), "input": str(source),
@@ -44,25 +50,27 @@ def initialize(args):
         "release_dir": str(source.parent.resolve()),
         "rig_object": args.rig, "mesh_objects": args.mesh,
         "source_mesh_parts": parts_map,
-        "source_preset": str(Path(args.source_preset).resolve()),
+        "source_preset": str(Path(args.source_preset or BUNDLED_DATA / "mmd_import.json").resolve()),
         "blender": str(Path(args.blender).expanduser().resolve()) if args.blender else "blender",
         "game": str(Path(args.game).expanduser().resolve()) if args.game else str((workspace / "game").resolve()),
-        "cli": environment(args.cli, "extracted/huohua_hand_normal_fix/runtime/DsrCli.exe"),
-        "runtime_manifest": environment(args.runtime_manifest, "extracted/huohua_hand_normal_fix/runtime/manifest.json"),
-        "native_blend": environment(args.native_blend, "extracted/blender/isaac_protagonist_merged_skeleton.blend"),
+        "cli": environment(args.cli, str(BUNDLED_RUNTIME / "DsrCli.exe")),
+        "runtime_manifest": environment(args.runtime_manifest, str(BUNDLED_RUNTIME / "manifest.json")),
+        "native_blend": environment(args.native_blend, str(BUNDLED_DATA / "native/isaac_protagonist_merged_skeleton.blend")),
         "native_rig_object": args.native_rig,
-        "skeleton_xml": environment(args.skeleton_xml, "extracted/skeleton/Player_Skeleton.xml"),
-        "skeleton_correction": not args.no_skeleton_correction,
-        "skeleton_cli": environment(args.skeleton_cli, "tools/FrostyToolsuite-src/FrostyToolsuite-1.0.7/FrostyEditor/bin/Release/Final/DsrCli.exe"),
-        "skeleton_globals_bank": environment(args.skeleton_globals_bank, "extracted/globals_shared.bin"),
-        "skeleton_baseline_ebx": environment(args.skeleton_baseline_ebx, "extracted/skeleton/Player_Skeleton.original.ebx"),
-        "skeleton_compiler": str(Path(args.skeleton_compiler).resolve()),
+        "skeleton_xml": environment(args.skeleton_xml, str(BUNDLED_DATA / "native/Player_Skeleton.xml")),
+        "animation_fix": bool(args.animation_fix),
+        "skeleton_correction": True,
+        "skeleton_package_mode": "split" if args.no_skeleton_correction else "merged",
+        "skeleton_cli": environment(args.skeleton_cli, str(BUNDLED_RUNTIME / "DsrCli.exe")),
+        "skeleton_globals_bank": environment(args.skeleton_globals_bank, str(BUNDLED_DATA / "native/globals_shared.bin")),
+        "skeleton_baseline_ebx": environment(args.skeleton_baseline_ebx, str(BUNDLED_DATA / "native/Player_Skeleton.original.ebx")),
+        "skeleton_compiler": str(Path(args.skeleton_compiler).resolve()) if args.skeleton_compiler else default_skeleton_compiler(),
         "stages": stages, "source_pose": source_pose,
         "mmd_addon": "bl_ext.user_default.mmd_tools", "mmd_import_scale": 0.08,
         "static_morph_policy": "current_visible",
         "transparent_policy": "remove_zero_opacity", "atlas_size": 8192,
         "minimum_elbow_bend_degrees": 15, "maximum_arm_stretch": 1.25,
-        "up_axis": 2, "scale_pivot": [0, 0, 0],
+        "up_axis": 2, "scale_pivot": [0, 0, 0], "height_alignment": args.height_alignment,
         "inner_material_pairs": [], "coincident_position_quantum": 1e-8}
     write_json(config_path, config)
     load_config(config_path)
@@ -83,10 +91,13 @@ def preflight(config):
         for image in report.get("images", []):
             if image.get("exists") and sha256(image["path"]) != image["sha256"]:
                 raise ValueError("A source image changed after import: " + image["path"])
+    from animation_fix import requirement as animation_requirement
     return {"input_sha256": sha256(config["input"]), "native_sha256": sha256(config["native_blend"]),
             "source_preset_sha256": sha256(config["source_preset"]), "runtime": runtime,
             "normalized_importer": True, "skeleton_override": False,
-            "skeleton_environment": dependencies(config)}
+            "skeleton_environment": dependencies(config),
+            "animation_fix_requirement": animation_requirement(config),
+            "height_alignment": config["height_alignment"]}
 
 
 def invoke(command, log, cwd=None):
@@ -121,6 +132,7 @@ def run(config, config_path, through):
     if state_path.exists():
         state = json.loads(state_path.read_text(encoding="utf-8"))
         if (state["config_sha256"] != digest
+                or state.get("height_alignment", "shoulder") != checks["height_alignment"]
                 or any(state.get(key) != checks[key] for key in
                        ("input_sha256", "native_sha256", "source_preset_sha256", "runtime", "skeleton_environment"))):
             raise ValueError("Job inputs changed; create a new output directory rather than mixing stages.")
@@ -203,6 +215,19 @@ def plan(config):
     return manifest
 
 
+def finish_packages(config, config_path, report):
+    """Record the external animation repair requirement; never merge it."""
+    from animation_fix import requirement as animation_requirement
+    report["geometry_package"] = report["package"]
+    report["animation_fix"] = animation_requirement(config)
+    report["body_package"] = report["package"]
+    if config["skeleton_correction"]:
+        from skeleton_correction import build as build_skeleton
+        correction = build_skeleton(config, config_path, report["package"], invoke)
+        report["package"] = correction["package"]
+        report["skeleton_correction"] = correction
+
+
 def build(config, config_path):
     runtime = preflight(config)
     work = Path(config["output"])
@@ -234,12 +259,7 @@ def build(config, config_path):
     report = {"package": {"path": str(mod), "bytes": mod.stat().st_size, "sha256": sha256(mod)},
               "plan": planned, "preflight": runtime, "commands": commands,
               "installed": False, "runtime_tested": False, "config_sha256": sha256(config_path)}
-    if config["skeleton_correction"]:
-        from skeleton_correction import build as build_skeleton
-        correction = build_skeleton(config, config_path, report["package"], invoke)
-        report["body_package"] = report["package"]
-        report["package"] = correction["package"]
-        report["skeleton_correction"] = correction
+    finish_packages(config, config_path, report)
     write_json(package / "build_manifest.json", report)
     print("BUILT " + report["package"]["path"])
 
@@ -256,6 +276,8 @@ def verify(config, config_path):
     report = json.loads((package / "verification/final_validation.json").read_text(encoding="utf-8"))
     report["package_sha256"] = build_report["package"]["sha256"]
     report["verification_command"] = command
+    from animation_fix import verify as verify_animation_fix
+    report["animation_fix"] = verify_animation_fix(build_report["animation_fix"])
     if config["skeleton_correction"]:
         from skeleton_correction import verify as verify_skeleton
         report["skeleton_correction"] = verify_skeleton(build_report["skeleton_correction"])
@@ -273,6 +295,9 @@ def release(config, config_path):
     if (not validation.get("passed") or validation.get("package_sha256") != digest
             or build_report["config_sha256"] != sha256(config_path)):
         raise ValueError("Release requires successful validation of this exact package.")
+    if config["animation_fix"]:
+        from animation_fix import verify as verify_animation_fix
+        verify_animation_fix(build_report["animation_fix"])
     if config["skeleton_correction"]:
         from skeleton_correction import verify as verify_skeleton
         verify_skeleton(build_report["skeleton_correction"])
@@ -280,26 +305,45 @@ def release(config, config_path):
             raise ValueError("Release requires validated skeleton correction.")
     directory = Path(config["release_dir"])
     directory.mkdir(parents=True, exist_ok=True)
-    destination = directory / mod.name
-    if destination.exists():
-        raise FileExistsError("A released package with this name already exists; preserve it.")
-    shutil.copy2(mod, destination)
+    correction = build_report.get("skeleton_correction", {})
+    split = config["skeleton_package_mode"] == "split" and correction.get("applied", False)
+    if split:
+        selected = [(Path(build_report["body_package"]["path"]), config["name"] + "_body.fbmod", "body"),
+                    (Path(correction["skeleton_package"]["path"]), config["name"] + "_skeleton.fbmod", "skeleton")]
+    else:
+        selected = [(mod, mod.name, "character")]
+    destinations = [(source, directory / name, role) for source, name, role in selected]
+    manifest_path = directory / (config["name"] + ".release.json")
+    for destination in [item[1] for item in destinations] + [manifest_path]:
+        if destination.exists():
+            raise FileExistsError("A release with this name already exists; preserve it: " + str(destination))
+    released = []
+    for source, destination, role in destinations:
+        shutil.copy2(source, destination)
+        if sha256(destination) != sha256(source):
+            raise ValueError("Released package differs from its validated source.")
+        released.append({"path": str(destination), "role": role, "sha256": sha256(destination),
+                         "bytes": destination.stat().st_size})
+    destination = Path(released[0]["path"])
     write_json(directory / (config["name"] + ".release.json"), {"package": str(destination),
-        "sha256": digest, "bytes": mod.stat().st_size,
+        "sha256": released[0]["sha256"], "bytes": released[0]["bytes"], "packages": released,
         "validation": str(package / "verification/final_validation.json"),
         "installed": False, "runtime_tested": False,
         "skeleton_override": bool(build_report.get("skeleton_correction", {}).get("applied")),
-        "skeleton_correction_mode": "matched_head_visual_offset" if config["skeleton_correction"] else "disabled",
-        "single_package": True})
-    print(str(destination))
+        "animation_fix": validation.get("animation_fix", {"enabled": False}), "head_visual_offset": False,
+        "skeleton_correction_mode": "matched_references" if config["skeleton_correction"] else "disabled",
+        "skeleton_package_mode": config["skeleton_package_mode"], "single_package": not split})
+    for item in released:
+        print(item["path"])
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     init = sub.add_parser("init")
-    for name in ("config", "name", "input", "source-preset"):
+    for name in ("config", "name", "input"):
         init.add_argument("--" + name, required=True)
+    init.add_argument("--source-preset", help="MMD import preset JSON; default is the bundled copy")
     init.add_argument("--rig", default="DSR_Rig")
     init.add_argument("--targets", nargs="+", default=["isaac_lv1", "isaac_legacy"],
                       choices=sorted(SUITS), help="Suit contracts replaced by one package")
@@ -310,15 +354,20 @@ def main():
     init.add_argument("--native-blend", help="unedited native reference BLEND path")
     init.add_argument("--native-rig", default="Reference", help="native reference armature object name")
     init.add_argument("--skeleton-xml", help="Player_Skeleton.xml path")
-    init.add_argument("--no-skeleton-correction", action="store_true", help="Disable the default matched skeleton plus Head visual compensation")
+    init.add_argument("--no-skeleton-correction", action="store_true",
+                      help="Release character body and skeleton correction as separate packages instead of merging them")
+    init.add_argument("--animation-fix", action="store_true",
+                      help="Record that the standalone dsr_animation_fix.fbmod must be loaded with this character")
     init.add_argument("--skeleton-cli", help="CLI supporting skeleton translation import and package readback")
     init.add_argument("--skeleton-globals-bank", help="Unmodified globals ANT bank")
     init.add_argument("--skeleton-baseline-ebx", help="Original raw Player_Skeleton EBX")
-    init.add_argument("--skeleton-compiler", default="D:/VisualStudio/MSBuild/Current/Bin/Roslyn/csc.exe")
+    init.add_argument("--skeleton-compiler", help="C# compiler; default is the Windows .NET Framework csc.exe")
     init.add_argument("--mesh", nargs="+", default=["CharacterMesh"])
     init.add_argument("--source-mesh-parts", nargs="*", default=[],
                       help="MESH:PART pairs whose whole source mesh maps to one DSR part")
     init.add_argument("--source-pose", choices=("AUTO", "A", "T", "DSR"))
+    init.add_argument("--height-alignment", choices=("head", "shoulder"), default="head",
+                      help="Uniform scale reference: native Head height (default) or mean shoulder height")
     init.add_argument("--workspace", default=DEFAULT_WORKSPACE)
     for command in ("preflight", "inspect", "run", "plan", "build", "verify", "release"):
         child = sub.add_parser(command)

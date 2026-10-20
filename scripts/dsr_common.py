@@ -2,11 +2,14 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 
 
 SKILL = Path(__file__).resolve().parents[1]
+BUNDLED_RUNTIME = SKILL / "runtime"
+BUNDLED_DATA = SKILL / "references/data"
 DEFAULT_WORKSPACE = "."
 PARTS = ("core", "spine", "head", "leftarm", "rightarm", "leftforearm",
          "rightforearm", "leftupleg", "rightupleg", "leftleg", "rightleg")
@@ -79,6 +82,15 @@ def inside(path, parent):
     return Path(path).resolve().is_relative_to(Path(parent).resolve())
 
 
+def default_skeleton_compiler():
+    windows = Path(os.environ.get("WINDIR", "C:/Windows"))
+    for candidate in (windows / "Microsoft.NET/Framework64/v4.0.30319/csc.exe",
+                      windows / "Microsoft.NET/Framework/v4.0.30319/csc.exe"):
+        if candidate.is_file():
+            return str(candidate)
+    raise FileNotFoundError("No C# compiler found; pass --skeleton-compiler.")
+
+
 def load_config(path):
     path = Path(path).resolve()
     value = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -88,6 +100,9 @@ def load_config(path):
     if any(target not in SUITS for target in targets) or len(set(targets)) != len(targets):
         raise ValueError("Unknown or duplicated target suit: " + ", ".join(targets))
     value["targets"] = targets
+    value.setdefault("height_alignment", "head")
+    if value["height_alignment"] not in ("head", "shoulder"):
+        raise ValueError("height_alignment must be head or shoulder.")
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", value["name"]):
         raise ValueError("Use a simple lowercase mod name without path separators.")
     for key in ("workspace", "input", "output", "release_dir", "blender", "game", "cli",
@@ -97,15 +112,29 @@ def load_config(path):
     value.setdefault("skeleton_correction", True)
     if not isinstance(value["skeleton_correction"], bool):
         raise ValueError("skeleton_correction must be true or false.")
+    value.setdefault("skeleton_package_mode", "merged")
+    if value["skeleton_package_mode"] not in ("merged", "split"):
+        raise ValueError("skeleton_package_mode must be merged or split.")
+    if value["skeleton_package_mode"] == "split" and not value["skeleton_correction"]:
+        raise ValueError("Split packages require skeleton_correction to be true.")
     defaults = {
-        "skeleton_cli": "tools/FrostyToolsuite-src/FrostyToolsuite-1.0.7/FrostyEditor/bin/Release/Final/DsrCli.exe",
-        "skeleton_globals_bank": "extracted/globals_shared.bin",
-        "skeleton_baseline_ebx": "extracted/skeleton/Player_Skeleton.original.ebx",
-        "skeleton_compiler": "D:/VisualStudio/MSBuild/Current/Bin/Roslyn/csc.exe",
+        "skeleton_cli": str(BUNDLED_RUNTIME / "DsrCli.exe"),
+        "skeleton_globals_bank": str(BUNDLED_DATA / "native/globals_shared.bin"),
+        "skeleton_baseline_ebx": str(BUNDLED_DATA / "native/Player_Skeleton.original.ebx"),
+        "skeleton_compiler": default_skeleton_compiler(),
     }
     for key, default in defaults.items():
-        item = Path(value.get(key, str(Path(value["workspace"]) / default) if key != "skeleton_compiler" else default))
+        explicit = value.get(key)
+        item = Path(explicit).expanduser() if explicit else Path(default).expanduser()
+        if not item.is_absolute():
+            item = Path(value["workspace"]) / item
         value[key] = str((path.parent / item).resolve() if not item.is_absolute() else item.resolve())
+    # The animation repair is an external package; legacy asset keys are dropped.
+    for key in ("animation_fix_mod", "animation_fix_archive", "animation_fix_manifest"):
+        value.pop(key, None)
+    value.setdefault("animation_fix", False)
+    if not isinstance(value["animation_fix"], bool):
+        raise ValueError("animation_fix must be true or false.")
     if not Path(value["release_dir"]).is_dir():
         raise ValueError("The configured release directory must already exist beside the source model.")
     if inside(value["release_dir"], value["output"]):
@@ -165,9 +194,8 @@ def check_runtime(config):
     seen = set()
     for entry in files:
         recorded = Path(entry["path"])
-        if inside(recorded, root):
-            candidate = recorded
-        else:
+        candidate = recorded if recorded.is_absolute() else root / recorded
+        if not inside(candidate, root):
             raise ValueError("Runtime manifest paths do not match the configured CLI directory.")
         if not candidate.is_file() or sha256(candidate) != entry["sha256"]:
             raise ValueError("Runtime checksum mismatch: " + str(candidate))
