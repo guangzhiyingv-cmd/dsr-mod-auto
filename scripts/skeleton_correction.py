@@ -1,4 +1,4 @@
-"""Build and validate one character package with optional matched/Head correction."""
+"""Build and validate one character package with optional matched reference correction."""
 
 import json
 from pathlib import Path
@@ -23,27 +23,33 @@ def validate_payload(config, root):
     core = SKILL / "scripts/skeleton"
     if str(core) not in sys.path:
         sys.path.insert(0, str(core))
-    from skeleton_math import read_pose, validate_offsets
+    from skeleton_math import read_pose
     matched = root / "matched_bind/imported.xml"
-    hybrid = next((root / "addon/matched/readback").glob("*.xml"))
-    profile = json.loads((root / "head/compensation.json").read_text())
-    offsets = {name: profile["visual_delta_native_xyz"] for name in profile["head_subtree"]}
-    result = validate_offsets(*read_pose(matched), *read_pose(hybrid), offsets)
+    actual = next((root / "addon/matched/readback").glob("*.xml"))
+    if read_pose(matched) != read_pose(actual):
+        raise ValueError("Skeleton differs from matched references; Head compensation is forbidden.")
+    expected_ebx = next((root / "matched_readback").glob("*.ebx"))
+    actual_ebx = next((root / "addon/matched/readback").glob("*.ebx"))
+    if sha256(expected_ebx) != sha256(actual_ebx):
+        raise ValueError("Packaged skeleton differs from the matched EBX.")
     raw = next((root / "addon/matched/readback").glob("*.res"))
-    if sha256(raw) != profile["ant_payload_to_preserve_sha256"]:
-        raise ValueError("Hybrid ANT defaults differ from matched.")
-    result["ant_matches_matched_exactly"] = True
-    return result
+    if sha256(raw) != sha256(root / "matched/patched_globals.res"):
+        raise ValueError("Packaged ANT defaults differ from matched.")
+    return {"matched_skeleton_exact": True, "ant_matches_matched_exactly": True,
+            "head_visual_offset": False}
+
 
 
 def verify(report):
+    if report.get("mode", "matched_references") != "matched_references" or report.get("head_visual_offset", False):
+        raise ValueError("Fixed Head visual compensation is no longer supported.")
     for path, expected in report["artifacts"].items():
         if not Path(path).is_file() or sha256(path) != expected:
             raise ValueError("Skeleton/merged artifact changed: " + path)
     if not report.get("passed"):
         raise ValueError("Skeleton correction did not validate.")
-    return {"passed": True, "mode": "matched_head_visual_offset",
-            "applied": report["applied"], "single_package": True,
+    return {"passed": True, "mode": "matched_references",
+            "applied": report["applied"], "single_package": report.get("single_package", True),
             "runtime_tested": False, "validation": report["validation"]}
 
 
@@ -78,7 +84,7 @@ def build(config, config_path, body, invoke):
            "--bank", config["skeleton_globals_bank"], "--base-release", root / "base_identity.json", "--out", root / "matched")
     trial = json.loads((root / "matched/trial.json").read_text())
     if trial["counts"]["changed_bind_positions"] == 0 and not trial["ant_edits"]:
-        report = {"enabled": True, "applied": False, "passed": True, "single_package": True,
+        report = {"mode": "matched_references", "head_visual_offset": False, "enabled": True, "applied": False, "passed": True, "single_package": True,
                   "reason": "Prepared anchors already match the native reference",
                   "package": body, "commands": commands, "dependencies": dependencies(config),
                   "artifacts": {body["path"]: body["sha256"],
@@ -91,36 +97,33 @@ def build(config, config_path, body, invoke):
         "--out", root / "matched_bind")
     bind_mod = root / "matched_bind/matched_bind.fbmod"
     cli("matched_readback", "extract-mod", bind_mod, "--out", root / "matched_readback")
-    matched_ebx = next((root / "matched_readback").glob("*.ebx"))
-    # The imported XML and extracted raw EBX refer to the same matched payload.
-    python("ant_bank", "--bank", config["skeleton_globals_bank"], "--skeleton-xml", config["skeleton_xml"], "--out", root / "audit")
-    python("prepare_head", "--audit", root / "audit/audit.json", "--trial", root / "matched/trial.json",
-           "--matched-xml", root / "matched_bind/imported.xml", "--out", root / "head")
-    head = json.loads((root / "head/compensation.json").read_text())
-    if any(abs(x) > 1e-10 for x in head["visual_delta_native_xyz"]):
-        cli("head_bind", "import-skeleton-translations", SKELETON, root / "head/translations.tsv",
-            "--baseline-ebx", matched_ebx, "--skeleton-mode", "visual-offset", "--mod-name", "head",
-            "--out", root / "head_bind")
-        bind_mod = root / "head_bind/head_visual_offset.fbmod"
     for name in ("package_skeleton", "merge_character"):
         run("compile_" + name, [config["skeleton_compiler"], "/nologo", "/target:exe",
             "/out:" + str(root / (name + ".exe")), core / (name + ".cs")])
+    split = config.get("skeleton_package_mode", "merged") == "split"
+    addon_name = config["name"] + "_skeleton" if split else "skeleton_internal"
+    addon = root / "addon/matched" / (addon_name + ".fbmod")
     run("package", [root / "package_skeleton.exe", Path(config["skeleton_cli"]).parent, config["game"],
         config["skeleton_globals_bank"], root / "matched/patched_globals.res", bind_mod, root / "addon",
-        "skeleton_internal", "Matched skeleton with Head compensation", "Intermediate skeleton payload for a single character package."])
+        addon_name, config["name"] + " - Skeleton correction",
+        "Matched skeleton references without fixed Head visual compensation. Enable with its matching character body package."])
     checks = validate_payload(config, root)
     run("merge", [root / "merge_character.exe", Path(config["skeleton_cli"]).parent, config["game"],
-        body["path"], root / "addon/matched/skeleton_internal.fbmod", root / "combined", config["name"],
-        config["name"] + " - Character with matched skeleton and Head compensation"])
+        body["path"], addon, root / "combined", config["name"],
+        config["name"] + " - Character with matched skeleton references"])
     final = root / "combined" / (config["name"] + ".fbmod")
     artifacts = {str(path): sha256(path) for folder in (root / "combined/readback", root / "addon/matched/readback")
                  for path in folder.iterdir() if path.is_file()}
     artifacts[str(final)] = sha256(final)
+    artifacts[str(addon)] = sha256(addon)
+    artifacts[body["path"]] = body["sha256"]
     # Include numerical-validation inputs, generated profiles and all implementation sources.
-    for path in [root / "matched_bind/imported.xml", root / "head/compensation.json", root / "matched/trial.json"]:
+    for path in [root / "matched_bind/imported.xml", root / "matched/trial.json"]:
         artifacts[str(path)] = sha256(path)
-    report = {"enabled": True, "applied": True, "passed": True, "single_package": True,
+    report = {"mode": "matched_references", "head_visual_offset": False, "enabled": True, "applied": True, "passed": True,
+              "single_package": config.get("skeleton_package_mode", "merged") == "merged",
               "package": {"path": str(final), "sha256": sha256(final), "bytes": final.stat().st_size},
+              "skeleton_package": {"path": str(addon), "sha256": sha256(addon), "bytes": addon.stat().st_size},
               "body_package": body, "checks": checks, "commands": commands,
               "dependencies": dependencies(config), "source_sha256": {str(p): sha256(p) for p in core.iterdir() if p.is_file()},
               "artifacts": artifacts, "validation": str(root / "validation.json"),

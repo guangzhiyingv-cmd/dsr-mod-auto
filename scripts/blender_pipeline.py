@@ -146,15 +146,20 @@ def scale(config, work):
     rig = bpy.data.objects["DSR_Rig"]
     target = native(config)
     if any(obj.parent != rig for obj in meshes()):
-        raise ValueError("Shoulder scaling requires every part to be parented to the mod rig.")
+        raise ValueError("Height scaling requires every part to be parented to the mod rig.")
     axis = int(config.get("up_axis", 2))
     pivot = Vector(config.get("scale_pivot", [0, 0, 0]))
-    names = ("LeftShoulder", "RightShoulder")
+    mode = config["height_alignment"]
+    names = ("Head",) if mode == "head" else ("LeftShoulder", "RightShoulder")
+    for obj in (rig, target):
+        missing = [name for name in names if name not in obj.data.bones]
+        if missing:
+            raise ValueError("Height alignment is missing bones in " + obj.name + ": " + ", ".join(missing))
     height = lambda obj: sum((obj.matrix_world @ obj.data.bones[name].head_local - pivot)[axis]
-                             for name in names) * .5
+                             for name in names) / len(names)
     source_height, target_height = height(rig), height(target)
     if min(source_height, target_height) <= 1e-9:
-        raise ValueError("Shoulder heights must be positive above the configured common pivot.")
+        raise ValueError("Alignment heights must be positive above the configured common pivot.")
     before = {obj.name: prep.world_vertices(obj) for obj in meshes()}
     factor = target_height / source_height
     transform = Matrix.Translation(pivot) @ Matrix.Scale(factor, 4) @ Matrix.Translation(-pivot)
@@ -163,19 +168,59 @@ def scale(config, work):
     error = max((point - transform @ old).length for obj in meshes()
                 for point, old in zip(prep.world_vertices(obj), before[obj.name]))
     if error > 1e-7 or abs(height(rig) - target_height) > 1e-7:
-        raise ValueError("Shoulder-height scaling failed its geometry check.")
+        raise ValueError("Height scaling failed its geometry check.")
     write_json(work / "reports/scale.json", {"uniform_scale": factor, "pivot": list(pivot),
+               "height_alignment": mode, "alignment_bones": list(names),
                "source_height": source_height, "target_height": target_height,
                "maximum_world_scale_error": error, "skeleton_override": False})
 
 
+def _face_uvs(obj, face):
+    layer = obj.data.uv_layers.get("UVChannel0") or obj.data.uv_layers.active
+    if layer is None or len(face.loop_indices) != 3:
+        return None
+    return [layer.data[index].uv for index in face.loop_indices]
+
+
+def _opaque_cover(uvs, sample_alpha):
+    """True only when the covering face samples opaque atlas texels throughout."""
+    centroid = (sum(u for u, _ in uvs) / 3.0, sum(v for _, v in uvs) / 3.0)
+    points = [centroid] + [(u * 0.8 + centroid[0] * 0.2, v * 0.8 + centroid[1] * 0.2) for u, v in uvs]
+    return all(sample_alpha(u, v) == 255 for u, v in points)
+
+
+def _atlas_alpha(work):
+    from PIL import Image
+    path = work / "textures/character_atlas.png"
+    if not path.exists():
+        raise ValueError("Coincident hidden-face removal needs the character atlas.")
+    with Image.open(path) as image:
+        alpha = image.convert("RGBA").getchannel("A")
+        width, height = alpha.size
+
+        def sample(u, v):
+            x = min(width - 1, max(0, int(u * width)))
+            y = min(height - 1, max(0, int((1.0 - v) * height)))
+            return alpha.getpixel((x, y))
+
+        return sample
+
+
 def cleanup(config, work):
     pairs = {int(a): int(b) for a, b in config.get("inner_material_pairs", [])}
+    hidden_pairs = {int(a): int(b) for a, b in config.get("coincident_hidden_pairs", [])}
+    duplicate_materials = {int(value) for value in config.get("coincident_duplicate_materials", [])}
     if len(set(pairs.values())) != len(pairs) or set(pairs) & set(pairs.values()):
         raise ValueError("Inner/outer material pair identities must be unambiguous.")
-    if not pairs:
+    if len(set(hidden_pairs.values())) != len(hidden_pairs) or set(hidden_pairs) & set(hidden_pairs.values()):
+        raise ValueError("Coincident hidden material pairs must be unambiguous.")
+    if set(hidden_pairs) & set(pairs) or set(hidden_pairs.values()) & set(pairs.values()):
+        raise ValueError("Opposite-winding and coincident pair rules must not overlap.")
+    materials = set(pairs) | set(pairs.values()) | set(hidden_pairs) | set(hidden_pairs.values()) | duplicate_materials
+    if not materials:
         write_json(work / "reports/cleanup.json", {"removed_faces": 0, "reason": "No confirmed inner material pairs"})
         return
+    sample_alpha = _atlas_alpha(work) if hidden_pairs else None
     locations = defaultdict(list)
     quantum = float(config.get("coincident_position_quantum", 1e-8))
     if quantum <= 0:
@@ -185,7 +230,7 @@ def cleanup(config, work):
             raise ValueError("Cleanup needs the original source material face attribute.")
         for face in obj.data.polygons:
             material = obj.data.attributes["source_material_index"].data[face.index].value
-            if material not in set(pairs) | set(pairs.values()):
+            if material not in materials:
                 continue
             if len(face.vertices) != 3:
                 raise ValueError("Confirmed duplicate-layer cleanup currently requires triangles.")
@@ -194,23 +239,61 @@ def cleanup(config, work):
             weights = tuple(sorted((key, tuple(sorted((obj.vertex_groups[g.group].name, round(g.weight, 7))
                             for g in obj.data.vertices[i].groups))) for key, i in zip(keys, face.vertices)))
             normal = (points[1] - points[0]).cross(points[2] - points[0]).normalized()
-            locations[tuple(sorted(keys))].append((obj, face.index, material, weights, normal))
+            locations[tuple(sorted(keys))].append({
+                "object": obj, "face": face.index, "material": material, "weights": weights,
+                "normal": normal, "uvs": _face_uvs(obj, face),
+                "source_face_id": obj.data.attributes["source_face_id"].data[face.index].value})
     removed, matched = defaultdict(set), []
+
+    def remove(record, mode, partner):
+        if record["face"] in removed[record["object"].name]:
+            return
+        removed[record["object"].name].add(record["face"])
+        matched.append({"outer_face_id": partner["source_face_id"] if partner else None,
+                        "inner_face_id": record["source_face_id"],
+                        "outer_material": partner["material"] if partner else None,
+                        "inner_material": record["material"], "mode": mode})
+
     for records in locations.values():
         for outer in records:
-            if outer[2] not in pairs:
+            if outer["material"] not in pairs:
                 continue
-            candidates = [inner for inner in records if inner[2] == pairs[outer[2]]
-                          and inner[3] == outer[3] and inner[4].dot(outer[4]) < -.99]
+            candidates = [inner for inner in records if inner["material"] == pairs[outer["material"]]
+                          and inner["weights"] == outer["weights"] and inner["normal"].dot(outer["normal"]) < -.99
+                          and inner["face"] not in removed[inner["object"].name]]
             if len(candidates) > 1:
                 raise ValueError("Ambiguous duplicate layer requires inspection.")
             for inner in candidates:
-                if inner[1] in removed[inner[0].name]:
-                    raise ValueError("One inner triangle has multiple exterior matches.")
-                removed[inner[0].name].add(inner[1])
-                matched.append({"outer_face_id": outer[0].data.attributes["source_face_id"].data[outer[1]].value,
-                                "inner_face_id": inner[0].data.attributes["source_face_id"].data[inner[1]].value,
-                                "outer_material": outer[2], "inner_material": inner[2]})
+                remove(inner, "opposite_winding", outer)
+        # A hidden layer is removed only when its coincident cover is fully
+        # opaque; transparent cutouts still need the skin underneath.
+        for hidden in records:
+            if hidden["material"] not in hidden_pairs or hidden["face"] in removed[hidden["object"].name]:
+                continue
+            candidates = [visible for visible in records
+                          if visible["material"] == hidden_pairs[hidden["material"]]
+                          and visible["weights"] == hidden["weights"]
+                          and visible["normal"].dot(hidden["normal"]) > .99]
+            if len(candidates) != 1:
+                if len(candidates) > 1:
+                    raise ValueError("Ambiguous opaque cover requires inspection.")
+                continue
+            visible = candidates[0]
+            if visible["uvs"] is None:
+                raise ValueError("Coincident hidden-face removal requires UVChannel0.")
+            if _opaque_cover(visible["uvs"], sample_alpha):
+                remove(hidden, "coincident_hidden", visible)
+        for material in duplicate_materials:
+            groups = defaultdict(list)
+            for record in records:
+                if record["material"] == material and record["face"] not in removed[record["object"].name]:
+                    groups[record["weights"]].append(record)
+            for faces in groups.values():
+                if len(faces) < 2:
+                    continue
+                faces.sort(key=lambda record: (record["object"].name, record["face"]))
+                for duplicate in faces[1:]:
+                    remove(duplicate, "duplicate_face", faces[0])
     for obj in list(meshes()):
         if removed[obj.name]:
             name = obj.name
@@ -219,7 +302,8 @@ def cleanup(config, work):
             filtered.name = name
     write_json(work / "reports/cleanup.json", {"removed_faces": len(matched), "matches": matched,
                "position_quantum": quantum, "weight_decimal_places": 7,
-               "selection": "Explicit pairs, opposite winding, coincident positions, matching skin weights"})
+               "selection": "Explicit opposite-winding pairs, opaque-covered coincident layers, "
+                            "and duplicate faces within confirmed materials"})
 
 
 def export(config, work):

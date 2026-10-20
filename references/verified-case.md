@@ -1,13 +1,21 @@
 # Verified Huohua case and historical branches
 
-## Current optional default: SuoMing matched skeleton with Head compensation
+## Current workflow: matched references plus optional animation repair
+
+On 2026-10-19 the user confirmed the Vivian translation-removal experiment
+`1eb88d36ed55cc69893fc1e0aafc46bf1d325b02980544cd18cdfdba64565c54`
+effective and selected the independent animation repair, which is now enabled
+with `--animation-fix` and omits fixed Head visual compensation. See
+[animation-fix.md](animation-fix.md). This supersedes the former default below;
+it does not establish all-state or all-character acceptance.
+
+## Historical optional default: SuoMing matched skeleton with Head compensation
 
 The user confirmed package SHA256
 `74a09a0024a6874065e8982b40685eb10a4dba11a7ee60a79245bba2ab0f4472`
 effective and requested matched skeleton plus Head visual offset as a default-on
-option. The user also requires one final FBMOD. Follow
-[skeleton-correction.md](skeleton-correction.md); the historical no-skeleton
-default and rejected probes below do not supersede that explicit selection.
+option. The user also requires one final FBMOD. This was the previous selection. The later Vivian selection above supersedes
+the fixed Head compensation; retain these hashes as historical evidence.
 
 The self-contained skill helpers regenerated the same raw SkeletonAsset and
 globals payloads from SuoMing's prepared BLEND, exactly matching the confirmed
@@ -18,10 +26,11 @@ its SHA256 is `fadc9cf137530dbab20f0fcfb4ab0043cd493c359099b575e05eb570c2d483a6`
 This new merged artifact was not installed or separately game-tested.
 
 The combination is case-confirmed, not all-model/all-animation acceptance.
-Keep the new optional default distinct from the historical experiments below.
+Keep this historical optional default distinct from the historical experiments below.
 
 This case is evidence for workflow decisions, not a universal model preset.
-Original source and third-party/game assets are not bundled with the skill.
+Original source models and third-party tools are not bundled. The current skill
+includes the required game-derived animation repair as a compressed resource.
 Source snapshot hashes and adapted module hashes are in `data/provenance.json`.
 
 The current skill defaults to packaging Isaac Lv1 and Legacy together and to

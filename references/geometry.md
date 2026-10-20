@@ -81,13 +81,18 @@ weights, smooth flags, and per-corner custom normals. Blender may re-encode
 normal vectors slightly; compare directions/tolerances rather than bitwise
 normal bytes. Never recompute all normals merely because cloth boundaries open.
 
-## Shoulder scaling and targeted hand fitting
+## Height scaling and targeted hand fitting
 
-Measure mean native and mod shoulder height in a common world frame. Scale the
+Select `height_alignment: "head"` (default) or `"shoulder"`. Head mode measures
+the native and mod `Head` bone origins, not bone tails, mesh tops or headwear.
+Shoulder mode measures the mean `LeftShoulder`/`RightShoulder` bone-origin
+height. Measure both rigs in a common world frame. Scale the
 whole mod rig and its parented meshes uniformly around the common pivot:
 `factor = target_height / source_height`. Keep mesh-local coordinates, weights,
 UVs and rest-bone local data unchanged. The tested case uses world origin and Z
 up. Different scene origins require an explicit coordinate correction.
+Record the selected mode and measured bone names in `reports/scale.json`.
+Do not repeat scaling for a prepared model that already completed it.
 
 Then use `_hands_core`:
 
@@ -124,3 +129,25 @@ rig data. Inspect exterior and backside visibility; one-sided cloth can expose
 holes when seen from inside. Thickness/two-sided shader work is separate from
 this proven duplicate-removal fix. The exact renderer stage causing the black
 result was not isolated.
+
+## Coincident same-winding layers
+
+Some source models draw one surface twice with the same winding: a skin layer
+under a garment, or an exact duplicate triangle. These are not reversed inner
+layers and the opposite-normal rule cannot remove them.
+
+- `coincident_hidden_pairs: [[hidden, cover], ...]` removes a hidden triangle
+  only when its three quantized world positions match a cover triangle, the
+  geometric normals agree (dot above `0.99`), the skin weights match, and the
+  cover samples fully opaque atlas texels at its centroid and at points twenty
+  percent inward from each corner.
+- `coincident_duplicate_materials: [material, ...]` collapses exact duplicates
+  within a listed material (same positions, winding and weights) to one retained
+  triangle.
+
+The opacity test is mandatory. A transparent cutout (lace, stocking tops) needs
+the skin underneath; removing it would open a visible hole. Both rules record
+every removed face as `inner_face_id` in `reports/cleanup.json`, so the export
+partition check continues to pass. Confirm material indices from the atlas
+report or an inspection of the prepared scene; never copy another model's
+indices.

@@ -71,7 +71,7 @@ internal static class MergeCharacter
         string final = Path.Combine(output, args[5] + ".fbmod");
         program.GetMethod("WriteCharacterMod", PrivateStatic).Invoke(null, new object[] {
             manager, final, args[6], "Character replacement",
-            "Single character package with model, textures, matched skeleton and Head inverse-bind visual compensation. Runtime untested for this build.",
+            "Single character package with model, textures, matched skeleton and required animation repair; no fixed Head visual compensation. Runtime untested for this build.",
             "Local pipeline"
         });
         string readback = Path.Combine(output, "readback");

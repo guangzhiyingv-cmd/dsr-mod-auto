@@ -1,0 +1,36 @@
+{
+  "method": "constant_tracks",
+  "sha256": "21d0ddb0efc8cb3a3d550d179f35d5781091e53de16cd8661296c38039c6d7e2",
+  "resource": "animations/antanimations/game/levels/root/ishimura_connected_win32_antstate",
+  "payload_sha256": "4ae6a5d4bb55e62caa1db2da50c134808b843705b575b19fb908cfb52d3de051",
+  "resource_counts": {
+    "Res": 1,
+    "Ebx": 0,
+    "Chunk": 0
+  },
+  "constant_channels": {
+    "Head.t": 889,
+    "LeftForeArm.t": 598
+  },
+  "target_translations": {
+    "Head.t": [0.03160339, -0.02551552, 1.127834e-07],
+    "LeftForeArm.t": [0.282634, 0.05629794, -0.01763735]
+  },
+  "additive_channels_zeroed": 18,
+  "changed_clips": 889,
+  "mapping_or_cardinality_changes": 0,
+  "player_rig_clips_checked": 954,
+  "character_independent": true,
+  "validated_readback": true,
+  "scope": "Ishimura main gameplay bank player-rig Eclipse clips",
+  "game_feedback": {
+    "date_local": "2026-10-20",
+    "reporter": "User",
+    "result": "Confirmed no load crash and correct Head/left-forearm alignment",
+    "tested_package_sha256": "c73fd066654565e9fdcb6aec7528bec7d42bc8575d37a0627447f3692647357d"
+  },
+  "superseded_method": "channel removal shortened shared ChannelToDofAsset mappings and crashed on load because 219 corpse-bank clips referenced the same keys; see docs/dsr-animation-fix-cross-bank-failure.md",
+  "archive_sha256": "6201f93fb9da259026352a5e159ec3f58116efb187bc4951580c65e69d38182b",
+  "archive_member": "dsr_head_leftforearm_translation_fix.fbmod",
+  "uncompressed_bytes": 155160587
+}

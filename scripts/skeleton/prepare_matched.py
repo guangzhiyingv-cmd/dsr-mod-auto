@@ -208,7 +208,7 @@ def main():
                          for path in (args.inspection,args.skeleton_xml,args.bank,args.base_release,Path(scene["source"]),Path(__file__))},
               "runtime_tested": False,
               "limitations": ["Static matrix validation only; animation overrides and procedural behavior remain unverified",
-                              "Existing shoulder scaling and hand fitting are retained for a controlled comparison",
+                              "Existing height scaling and hand fitting are retained for a controlled comparison",
                               "Unmapped helper offsets are translated with ancestors, not individually refitted"]}
     args.out.mkdir(parents=True, exist_ok=True)
     rows = ["# bone\tparent\tbaseline_x\tbaseline_y\tbaseline_z\tdelta_x\tdelta_y\tdelta_z"]

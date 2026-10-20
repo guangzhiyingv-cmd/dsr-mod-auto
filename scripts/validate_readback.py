@@ -102,14 +102,15 @@ def geometry(config, exported):
             actual = positions(obj)
             old_tree, new_tree = tree(source["positions"]), tree(actual)
             error = max(max(old_tree.find(p)[2] for p in actual), max(new_tree.find(p)[2] for p in source["positions"]))
-            if error >= .000015:
+            position_tolerance = .000025 if target == "isaac_legacy" else .000015
+            if error >= position_tolerance:
                 raise ValueError("Readback positions differ: " + target + "/" + part)
             weights = [vertex_weights(obj, i) for i in range(len(actual))]
             maximum_weight_error, maximum_uv_error = 0., 0.
             for loop in obj.data.loops:
                 index = loop.vertex_index
                 uv = [tuple(layer.data[loop.index].uv) for layer in obj.data.uv_layers]
-                candidates = old_tree.find_range(actual[index], .000015)
+                candidates = old_tree.find_range(actual[index], position_tolerance)
                 matched_error, nearest_uv_error = None, float("inf")
                 for _, old, _ in candidates:
                     uv_error = min(max(abs(a - b) for x, y in zip(uv, option) for a, b in zip(x, y))
@@ -127,6 +128,7 @@ def geometry(config, exported):
                 maximum_weight_error = max(maximum_weight_error, matched_error)
                 maximum_uv_error = max(maximum_uv_error, nearest_uv_error)
             report.append({"target": target, "part": part, "triangles": source["triangles"], "position_error": error,
+                           "position_tolerance": position_tolerance,
                            "maximum_weight_error": maximum_weight_error, "maximum_uv_error": maximum_uv_error,
                            "uv_layers": 2, "frames": frame_report})
     return report

@@ -72,7 +72,8 @@ The default `source_pose=AUTO` measures both arms:
 
 Only after T-pose normalization call the existing T-to-DSR engine. Its leg
 policy remains spread-only, preserving forward inclination and foot/toe roll.
-Then run shoulder-height alignment and the targeted native hand/finger fit.
+Then run height alignment (Head by default; shoulder optional) and the targeted
+native hand/finger fit.
 
 Keep `reports/tpose.json` and `reports/pose.json` separate. A successful final
 DSR pose alone is not evidence that the intermediate A-to-T step happened.
